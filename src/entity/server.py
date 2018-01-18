@@ -21,11 +21,17 @@ class Server(object):
         else:
             return 0.0
 
-    def is_valid_for_job(self, t, job):
-        # 完全没必要考虑 waiting list，因为基于历史数据，全部过程是决定性的，我们判断本质不会影响过程
-        for i in range(job.process_time):
-            if self.usage_list[i + t] * self.resources + job.resources < self.resources:
-                continue
-            else:
-                return False
-        return True
+    def free_resources(self, t):
+        return self.resources - self.usage_list[t] * self.resources
+
+    def is_valid_for_job(self, job):
+        # 完全没必要考虑 waiting list，因为基于历史数据，全部过程是决定性的，判断本质不会影响过程
+        # 只需要判断在提交时刻开始的 process time 时长内空闲的 resources 能否满足 job 需求
+        count = 0
+        for i in range(job.submit_time, job.deadline):
+            if self.free_resources(i) >= job.resources:
+                count = count + 1
+        if count >= job.process_time:
+            return True
+        else:
+            return False
