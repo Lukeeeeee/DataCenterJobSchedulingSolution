@@ -7,18 +7,18 @@ import random
 import json
 import datetime
 
-T = 200
-sim_t = 100
+T = 2000
+sim_t = 1500
 process_t_lower = 1
 process_t_upper = 30
-job_resource_lower = 1
-job_resource_upper = 30
-server_r = 30
+job_resource_lower = 5
+job_resource_upper = 20
+server_r = 40
 server_count = 5
 current_time = 0
 a = 5.0
-b = 3.0
-server_heat_constant = 10
+b = 10.0
+server_heat_constant = 100
 
 alpha = 0.5
 beta = 0.5
@@ -63,6 +63,7 @@ class Server(object):
             self.queue.append((job, start_t))
             job.host_server = self.id
             job.start_t = start_t
+            job.finish_t = job.process_t + start_t - 1
             for i in range(start_t, job.process_t + start_t):
                 self.usage_list[i] = self.usage_list[i] + job.r / (self.r * 1.0)
                 self.energy_list[i] = self.usage_list[i] * a + b * (self.usage_list[i] > 0.000001)
@@ -78,7 +79,6 @@ class Server(object):
         for job in self.current_job:
             job.left_time = job.left_time - 1
             if job.left_time == 0.0:
-                job.finish_t = current_time
                 self.current_job.remove(job)
         self.heat_list[current_time] = self.energy_list[current_time] * server_heat_constant * \
                                        (1.0 - self.dis_to_center / 10.0)
@@ -89,10 +89,10 @@ class Server(object):
             "Y": self.y,
             "USAGE": self.usage_list[ti],
             "ENERGY": self.energy_list[ti],
-            "IS_VALID": self.is_valid[ti],
+            "IS_VALID": int(self.is_valid[ti]),
             "RESOURCE": self.r,
             "HEAT": self.heat_list[ti],
-            'ID': self.id
+            # 'ID': self.id
         }
 
 
@@ -114,7 +114,7 @@ class Job(object):
             "PROCESS_TIME": self.process_t,
             "RESOURCES": self.r,
             "FINISH_TIME": self.finish_t,
-            "HOST_SERVER": self.host_server
+            # "HOST_SERVER": self.host_server
         }
 
 
@@ -157,7 +157,7 @@ class Reward(object):
     def return_reward_dict(self, ti):
         return {
             "REWARD": self.reward_list[ti],
-            "TIME": ti
+            # "TIME": ti
         }
 
 
@@ -169,19 +169,22 @@ def get_state(ti, server_list, job_list, dc):
     state['SERVER_STATE'] = reward_state_dict
     state['JOB_STATE'] = job_list[ti].return_state_dict()
     state['DC'] = dc.return_state_dict(ti)
-    state['TIME'] = ti
+    # state['TIME'] = ti
     return state
 
 
 def get_one_sample(ti, server_list, job_list, dc, re):
     state = get_state(ti, server_list, job_list, dc)
     state_next = get_state(ti + 1, server_list, job_list, dc)
-    action = {
-        "ACTION": job_list[ti].host_server,
-        "TIME": ti
-    }
+
     reward = re.return_reward_dict(ti)
-    return state, action, reward, state_next
+    return {
+        "TIME": ti,
+        "STATE": state,
+        "ACTION": job_list[ti].host_server,
+        "REWARD": reward,
+        "NEXT_STATE": state_next
+    }
 
 
 def main():
@@ -203,19 +206,22 @@ def main():
         r = int(random.uniform(job_resource_lower, job_resource_upper))
         new_job = Job(sub_t=sub_t, ddl=ddl, process_t=process_t, r=r)
         job_list.append(new_job)
-        flag = False
         valid_server = []
         for server in server_list:
-            res, ti = server.check_with_job(new_job)
+            res, _ = server.check_with_job(new_job)
             if res is True:
                 server.is_valid[current_time] = True
                 valid_server.append(server.id)
             print(server.is_valid[current_time])
         if len(valid_server) == 0:
             raise Exception("Error resoruces")
+            pass
         else:
-            k = int(math.floor(random.uniform(0, len(valid_server))))
-            server_list[k].add_job(new_job)
+            random.shuffle(valid_server)
+            k = valid_server[0]
+            print(k)
+            if server_list[k].add_job(new_job) is False:
+                raise Exception("Error")
         for server in server_list:
             server.step()
         dc.step(server_list=server_list)
