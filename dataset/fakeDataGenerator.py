@@ -6,22 +6,23 @@ import math
 import random
 import json
 import datetime
+from src.config import Config as con
 
-T = 2000
-sim_t = 1500
-process_t_lower = 1
-process_t_upper = 30
-job_resource_lower = 5
-job_resource_upper = 20
-server_r = 40
-server_count = 5
-current_time = 0
-a = 5.0
-b = 10.0
-server_heat_constant = 100
+T = con.T
+sim_t = con.sim_t
+process_t_lower = con.process_t_lower
+process_t_upper = con.process_t_upper
+job_resource_lower = con.job_resource_lower
+job_resource_upper = con.job_resource_upper
+server_r = con.server_r
+server_count = con.server_count
+current_time = con.current_time
+a = con.a
+b = con.b
+server_heat_constant = con.server_heat_constant
 
-alpha = 0.5
-beta = 0.5
+alpha = con.alpha
+beta = con.beta
 
 ti = datetime.datetime.now()
 log_dir = (
@@ -66,7 +67,7 @@ class Server(object):
             job.finish_t = job.process_t + start_t - 1
             for i in range(start_t, job.process_t + start_t):
                 self.usage_list[i] = self.usage_list[i] + job.r / (self.r * 1.0)
-                self.energy_list[i] = self.usage_list[i] * a + b * (self.usage_list[i] > 0.000001)
+                self.energy_list[i] = self.usage_list[i] * a + b[self.id] * (self.usage_list[i] > 0.0000001)
             return True
 
     def step(self):
@@ -81,7 +82,7 @@ class Server(object):
             if job.left_time == 0.0:
                 self.current_job.remove(job)
         self.heat_list[current_time] = self.energy_list[current_time] * server_heat_constant * \
-                                       (1.0 - self.dis_to_center / 10.0)
+                                       (1.0 / math.exp(self.dis_to_center * 10))
 
     def return_state_dict(self, ti):
         return {
@@ -145,8 +146,9 @@ class Reward(object):
         for i in range(T):
             efficiency_sum = 0.0
             for server in server_list:
-                efficiency_sum = efficiency_sum + (server.usage_list[i] + 0.00000001) / (
-                server.energy_list[i] + 0.00000001)
+                efficiency_sum = efficiency_sum + (server.usage_list[i] + 0.00000001) / \
+                                                  (server.energy_list[i] + 0.00000001)
+                # efficiency_sum = efficiency_sum + server.energy_list[i]
 
             if i > 0:
                 delta_heat = dc.heat_list[i - 1] - dc.heat_list[i]
@@ -191,10 +193,10 @@ def main():
     global current_time
     job_list = []
     server_list = []
-    x = [-1, -1, 0, 1, 1]
-    y = [-1, 1, 0, -1, 1]
+    x = con.server_pos_x
+    y = con.server_pos_y
     dc = DataCenter()
-    for i in range(5):
+    for i in range(server_count):
         server = Server(x=x[i], y=y[i], no=i)
         server_list.append(server)
 
@@ -214,14 +216,28 @@ def main():
                 valid_server.append(server.id)
             print(server.is_valid[current_time])
         if len(valid_server) == 0:
-            raise Exception("Error resoruces")
+            raise Exception("Error: resources")
             pass
         else:
             random.shuffle(valid_server)
-            k = valid_server[0]
-            print(k)
-            if server_list[k].add_job(new_job) is False:
-                raise Exception("Error")
+            # choose max usage server
+
+            # max_usage_server = valid_server[0]
+            # for server_id in valid_server:
+            #     if server_list[server_id].usage_list[current_time] > server_list[max_usage_server].usage_list[current_time]:
+            #         max_usage_server = server_id
+
+            max_usage_server = valid_server[0]
+
+            for server_id in valid_server:
+                if server_list[server_id].dis_to_center > server_list[max_usage_server].dis_to_center:
+                    max_usage_server = server_id
+
+            # Random choose
+
+            # print(k)
+            if server_list[max_usage_server].add_job(new_job) is False:
+                raise Exception("Error %d" % max_usage_server)
         for server in server_list:
             server.step()
         dc.step(server_list=server_list)

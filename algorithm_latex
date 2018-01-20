@@ -1,0 +1,29 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+% \usepackage[noend]{algpseudocode}
+
+
+\begin{document}
+\begin{algorithm}
+\caption{Modified Q-learning}
+Initialize action-value function $Q$ with random weights $\theta$ and target $Q^{'}$ function with weights $\theta^{'}$
+
+\begin{algorithmic}
+
+\FOR{$episode=1, \textit{M}$}
+    \FOR{$t=1, \textit{T}$}
+    \text{Randomly select minibatch from dataset $(state_{j}, action_{j}, reward_{j}, state_{j+1})$}
+    \text{Set $y_{j}= reward_{j} + \gamma{max}_{a^{'}}{Q^{'}(state_{j+1}, a^{'}; \theta^{'})}$}
+    \text{Perform a gradient descent step on $(y_{j} - Q(state_{j}, action_{j}; \theta)^{2}$ to update $\theta$}
+    \text{}
+    \IF{t mod UpdateTargetQEveryStep = 0}
+    \text{Update $\theta^{'}$}
+    \ENDIF
+    \ENDFOR
+\ENDFOR
+
+\end{algorithmic}
+\end{algorithm}
+\end{document}

@@ -3,14 +3,28 @@ import random
 import json
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+import math
+from src.config import Config as con
 
-server_count = 5
-server_state_dim = 7
-total_server_state_dim = server_count * server_state_dim
-server_feature_dim = 4
-job_state_dim = 5
-dc_state_dim = 1
-action_dim = server_count
+server_count = con.server_count
+server_state_dim = con.server_state_dim
+# [R, ENERGY, Y, HEAT, IS_VALID, USAGE, X]
+total_server_state_dim = con.total_server_state_dim
+server_feature_dim = con.server_feature_dim
+job_state_dim = con.job_state_dim
+dc_state_dim = con.dc_state_dim
+action_dim = con.action_dim
+
+
+def check_data(sample):
+    # Check heat
+    total_heat = 0.0
+    for i in range(server_count):
+        total_heat = total_heat + sample['NEXT_STATE']['SERVER_STATE'][str(i)]['HEAT']
+    total_heat = total_heat + 0.6 * sample['STATE']['DC']['TOTAL_HEAT']
+    if math.fabs(total_heat - sample['NEXT_STATE']['DC']['TOTAL_HEAT']) > 0.01:
+        raise Exception('heat computing error %d' % math.fabs(total_heat - sample['NEXT_STATE']['DC']['TOTAL_HEAT']))
+    pass
 
 
 class Environment(object):
@@ -21,6 +35,7 @@ class Environment(object):
         self.handled_dataset = []
         random.shuffle(self.dataset)
         for sample in self.dataset:
+            check_data(sample)
             new_sample = dict()
             new_sample['STATE'] = self.handle_state_dict(state_dict=sample['STATE'])
             new_sample['NEXT_STATE'] = self.handle_state_dict(state_dict=sample['NEXT_STATE'])
@@ -62,6 +77,10 @@ class Environment(object):
 
         batch_dict['ACTION'] = [batch_data[i]['ACTION'] for i in range(batch_size)]
         batch_dict['REWARD'] = [batch_data[i]['REWARD'] for i in range(batch_size)]
+
+        for i in range(len(batch_dict['REWARD'])):
+            batch_dict['REWARD'][i] = [batch_dict['REWARD'][i] for _ in range(server_count)]
+
         return batch_dict
 
     def handle_state_dict(self, state_dict):
@@ -123,7 +142,7 @@ class Environment(object):
 
 
 if __name__ == '__main__':
-    file_name = "1-19-17-24-24.data"
+    file_name = "1-20-2-21-40.data"
     a = Environment(file_name)
     t = a.return_mini_batch(0, 10)
     pass
