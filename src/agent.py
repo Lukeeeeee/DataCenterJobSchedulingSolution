@@ -344,6 +344,7 @@ def do_print(test_batch, epoch, iter, print_flag=False):
     training_data_list.append(dict)
     pass
 
+
 if __name__ == '__main__':
 
     from src.environment import Environment
